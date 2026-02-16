@@ -1,255 +1,64 @@
+// banking.c
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_USERS 100
+#define MAX_NAME_LEN 50
+
 typedef struct {
-    int accountNumber;
-    char name[50];
-    char password[20];
+    char name[MAX_NAME_LEN];
     float balance;
-} Account;
+} User;
 
-int accountExists(int accNo) {
-    FILE *fp = fopen("accounts.txt", "r");
-    if (fp == NULL)
-        return 0;
+User users[MAX_USERS];
+int user_count = 0;
 
-    Account acc;
-    while (fscanf(fp, "%d|%49[^|]|%19[^|]|%f\n",
-                  &acc.accountNumber,
-                  acc.name,
-                  acc.password,
-                  &acc.balance) == 4) {
-        if (acc.accountNumber == accNo) {
-            fclose(fp);
-            return 1;
-        }
+void add_user(const char* name, float initial_balance) {
+    if (user_count >= MAX_USERS) {
+        printf("Error: Maximum number of users reached.\n");
+        return;
     }
-
-    fclose(fp);
-    return 0;
+    strncpy(users[user_count].name, name, MAX_NAME_LEN);
+    users[user_count].balance = initial_balance;
+    user_count++;
+    printf("User added: %s with balance %.2f\n", name, initial_balance);
 }
 
-void createAccount() {
-    Account acc;
-
-    printf("Enter Account Number: ");
-    scanf("%d", &acc.accountNumber);
-    getchar();
-
-    if (accountExists(acc.accountNumber)) {
-        printf("Account already exists!\n");
+void deposit(User* user, float amount) {
+    if (amount < 0) {
+        printf("Error: Deposit amount must be positive.\n");
         return;
     }
-
-    printf("Enter Name: ");
-    fgets(acc.name, sizeof(acc.name), stdin);
-    acc.name[strcspn(acc.name, "\n")] = '\0';
-
-    printf("Set Password: ");
-    fgets(acc.password, sizeof(acc.password), stdin);
-    acc.password[strcspn(acc.password, "\n")] = '\0';
-
-    acc.balance = 0.0;
-
-    FILE *fp = fopen("accounts.txt", "a");
-    if (fp == NULL) {
-        printf("Error creating file!\n");
-        return;
-    }
-
-    fprintf(fp, "%d|%s|%s|%.2f\n",
-            acc.accountNumber,
-            acc.name,
-            acc.password,
-            acc.balance);
-
-    fclose(fp);
-
-    printf("Account created successfully!\n");
+    user->balance += amount;
+    printf("Deposited %.2f to %s's account. New balance: %.2f\n", amount, user->name, user->balance);
 }
 
-int authenticate(int accNo, char *password, Account *acc) {
-    FILE *fp = fopen("accounts.txt", "r");
-    if (fp == NULL) {
-        printf("No accounts found!\n");
-        return 0;
+void withdraw(User* user, float amount) {
+    if (amount < 0) {
+        printf("Error: Withdrawal amount must be positive.\n");
+        return;
     }
-
-    while (fscanf(fp, "%d|%49[^|]|%19[^|]|%f\n",
-                  &acc->accountNumber,
-                  acc->name,
-                  acc->password,
-                  &acc->balance) == 4) {
-
-        if (acc->accountNumber == accNo &&
-            strcmp(acc->password, password) == 0) {
-            fclose(fp);
-            return 1;
-        }
+    if (amount > user->balance) {
+        printf("Error: Insufficient funds for withdrawal.\n");
+        return;
     }
-
-    fclose(fp);
-    return 0;
+    user->balance -= amount;
+    printf("Withdrew %.2f from %s's account. New balance: %.2f\n", amount, user->name, user->balance);
 }
 
-void rewriteFile(Account updatedAcc) {
-    FILE *fp = fopen("accounts.txt", "r");
-    FILE *temp = fopen("temp.txt", "w");
-
-    if (fp == NULL || temp == NULL) {
-        printf("File error!\n");
-        return;
-    }
-
-    Account acc;
-
-    while (fscanf(fp, "%d|%49[^|]|%19[^|]|%f\n",
-                  &acc.accountNumber,
-                  acc.name,
-                  acc.password,
-                  &acc.balance) == 4) {
-
-        if (acc.accountNumber == updatedAcc.accountNumber) {
-            fprintf(temp, "%d|%s|%s|%.2f\n",
-                    updatedAcc.accountNumber,
-                    updatedAcc.name,
-                    updatedAcc.password,
-                    updatedAcc.balance);
-        } else {
-            fprintf(temp, "%d|%s|%s|%.2f\n",
-                    acc.accountNumber,
-                    acc.name,
-                    acc.password,
-                    acc.balance);
-        }
-    }
-
-    fclose(fp);
-    fclose(temp);
-
-    fp = fopen("accounts.txt", "w");
-    temp = fopen("temp.txt", "r");
-
-    while (fgets(updatedAcc.name, sizeof(updatedAcc.name), temp)) {
-        fputs(updatedAcc.name, fp);
-    }
-
-    fclose(fp);
-    fclose(temp);
-}
-
-void deposit() {
-    int accNo;
-    char password[20];
-    float amount;
-    Account acc;
-
-    printf("Enter Account Number: ");
-    scanf("%d", &accNo);
-    getchar();
-
-    printf("Enter Password: ");
-    fgets(password, sizeof(password), stdin);
-    password[strcspn(password, "\n")] = '\0';
-
-    if (!authenticate(accNo, password, &acc)) {
-        printf("Authentication failed!\n");
-        return;
-    }
-
-    printf("Enter Amount: ");
-    scanf("%f", &amount);
-
-    if (amount <= 0) {
-        printf("Invalid amount!\n");
-        return;
-    }
-
-    acc.balance += amount;
-    rewriteFile(acc);
-
-    printf("Deposit successful! New Balance: %.2f\n", acc.balance);
-}
-
-
-void withdraw() {
-    int accNo;
-    char password[20];
-    float amount;
-    Account acc;
-
-    printf("Enter Account Number: ");
-    scanf("%d", &accNo);
-    getchar();
-
-    printf("Enter Password: ");
-    fgets(password, sizeof(password), stdin);
-    password[strcspn(password, "\n")] = '\0';
-
-    if (!authenticate(accNo, password, &acc)) {
-        printf("Authentication failed!\n");
-        return;
-    }
-
-    printf("Enter Amount: ");
-    scanf("%f", &amount);
-
-    if (amount <= 0 || amount > acc.balance) {
-        printf("Invalid or insufficient balance!\n");
-        return;
-    }
-
-    acc.balance -= amount;
-    rewriteFile(acc);
-
-    printf("Withdrawal successful! New Balance: %.2f\n", acc.balance);
-}
-
-void checkBalance() {
-    int accNo;
-    char password[20];
-    Account acc;
-
-    printf("Enter Account Number: ");
-    scanf("%d", &accNo);
-    getchar();
-
-    printf("Enter Password: ");
-    fgets(password, sizeof(password), stdin);
-    password[strcspn(password, "\n")] = '\0';
-
-    if (authenticate(accNo, password, &acc)) {
-        printf("Name: %s\nBalance: %.2f\n",
-               acc.name, acc.balance);
-    } else {
-        printf("Authentication failed!\n");
-    }
+void display_user(User* user) {
+    printf("User: %s, Balance: %.2f\n", user->name, user->balance);
 }
 
 int main() {
-    int choice;
-
-    while (1) {
-        printf("\n--- Banking System ---\n");
-        printf("1. Create Account\n");
-        printf("2. Deposit\n");
-        printf("3. Withdraw\n");
-        printf("4. Check Balance\n");
-        printf("5. Exit\n");
-        printf("Enter choice: ");
-
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1: createAccount(); break;
-            case 2: deposit(); break;
-            case 3: withdraw(); break;
-            case 4: checkBalance(); break;
-            case 5: exit(0);
-            default: printf("Invalid choice!\n");
-        }
-    }
+    add_user("Alice", 1000.00);
+    add_user("Bob", 500.00);
+    deposit(&users[0], 200.00);
+    withdraw(&users[1], 100.00);
+    display_user(&users[0]);
+    display_user(&users[1]);
 
     return 0;
 }
